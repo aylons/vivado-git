@@ -1262,6 +1262,11 @@ proc filter { prop val { file {} } } {
     return 1
   }
 
+  # filter incremental_checkpoint - references .dcp files that are synthesis artifacts
+  if { [string equal -nocase $prop {INCREMENTAL_CHECKPOINT}] } {
+    return 1
+  }
+
   # filter sim_types
   if { ([string equal -nocase $prop {allowed_sim_models}]) } {
     return 1
@@ -1930,6 +1935,8 @@ proc write_files { proj_dir proj_name tcl_obj type } {
   foreach file [get_files -quiet -norecurse -of_objects [get_filesets $tcl_obj] -filter $bc_managed_fs_filter] {
     if { [is_switch_network_source $file] } { continue }
     if { [file extension $file] == ".xcix" } { continue }
+    # Skip design checkpoint files (.dcp) - these are synthesis/implementation artifacts
+    if { [file extension $file] == ".dcp" } { continue }
     # Skip direct import/add of BD files if -use_bd_files is not provided
     if { [file extension $file] == ".bd" && !$a_global_vars(b_arg_use_bd_files) } { continue }
 
