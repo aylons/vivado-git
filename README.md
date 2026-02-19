@@ -54,6 +54,8 @@ Vivado is a pain in the ass to source control decently, so these scripts provide
         ├── .gitignore
         ├── project_name.tcl         # Project generator script
         ├── src/                     # Tracked source files
+        │   ├── bd/                      # BD Tcl source files
+        │   │    └── *.tcl
         │   ├── design/
         │   │    ├── *.v
         │   │    └── *.vhd
@@ -112,8 +114,8 @@ example on how you can structure your project.
 
 #### Block design support
 
-If a block design is present, Tcl procedures will be integrated in the project
-generator file to regenerate it. Make sure to specify it as `<Local to Project>`
+If a block design is present, a Tcl script for each BD is created under the
+`src/bd` directory to regenerate it. Make sure to specify it as `<Local to Project>`
 when creating the Block Design with the GUI, so that it is created inside the
 `vivado_project` directory.
 

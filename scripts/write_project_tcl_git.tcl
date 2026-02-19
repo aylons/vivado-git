@@ -282,9 +282,7 @@ proc write_project_tcl_script {} {
   variable l_remote_files
   variable l_local_files
   variable l_bd_wrapper
-  variable temp_dir
-  variable temp_offset 1
-  variable clean_temp
+  variable bd_proc_dir
   variable l_open_bds [list]
   variable l_added_bds
   variable a_os
@@ -300,13 +298,12 @@ proc write_project_tcl_script {} {
   set l_added_bds [list]
   set l_validate_repo_paths [list]
 
-  # Create temp directory (if required) for BD procs
-  set temp_dir [ file join [file dirname $a_global_vars(script_file)] .Xiltemp ]
-  set clean_temp 1
-  if { [file isdirectory $temp_dir] || $a_global_vars(b_arg_use_bd_files) } {
-    set clean_temp 0
-  } else {
-    file mkdir $temp_dir
+  # Create directory for BD procs
+  set bd_proc_dir [ file join [file dirname $a_global_vars(script_file)] "src/bd" ]
+  if { !($a_global_vars(b_arg_use_bd_files)) } {
+    if { ![file isdirectory $bd_proc_dir] } {
+      file mkdir $bd_proc_dir
+    }
   }
 
   # Get OS
@@ -704,9 +701,8 @@ proc write_bd_as_proc { bd_file } {
   variable l_added_bds
   variable l_bd_proc_calls
   variable l_script_data
-  variable temp_offset
   variable l_open_bds
-  variable temp_dir
+  variable bd_proc_dir
   variable bd_prop_steps
   set bd_file [list "$bd_file"]
 
@@ -727,15 +723,14 @@ proc write_bd_as_proc { bd_file } {
   }
   current_bd_design [get_bd_designs [file rootname $bd_filename]]
 
-  # write the BD as a proc to a temp file
-  while { [file exists [file join $temp_dir "temp_$temp_offset.tcl"]] } {
-    incr temp_offset
-  }
-  set temp_bd_file [file join $temp_dir "temp_$temp_offset.tcl"]
+  # write the BD as a proc to a file
+  set bd_proc_filename "[file rootname [file tail $bd_file]].tcl"
+  set bd_proc_filepath [file join $bd_proc_dir $bd_proc_filename]
+
   if { $a_global_vars(b_arg_no_ip_version) } {
-    write_bd_tcl -no_project_wrapper -no_ip_version -make_local $temp_bd_file
+    write_bd_tcl -no_project_wrapper -no_ip_version -make_local $bd_proc_filepath
   } else {
-    write_bd_tcl -no_project_wrapper -make_local $temp_bd_file
+    write_bd_tcl -no_project_wrapper -make_local $bd_proc_filepath
   }
 
   # Set non default properties for the BD
@@ -747,7 +742,7 @@ proc write_bd_as_proc { bd_file } {
   }
 
   # Get proc call
-  if {[catch {open $temp_bd_file r} fp]} {
+  if {[catch {open $bd_proc_filepath r} fp]} {
     if { $a_global_vars(b_arg_quiet) } {
       reset_msg_setting
     }
@@ -767,15 +762,12 @@ proc write_bd_as_proc { bd_file } {
   } then {
     append str " \"\""
     lappend l_script_data "\n"
-    lappend l_script_data $file_data
+    set bd_proc_relative_path "src/bd/$bd_proc_filename"
+    lappend l_script_data "source \$origin_dir/$bd_proc_relative_path"
     lappend l_added_bds $bd_file
     lappend l_script_data $str
     lappend l_script_data $bd_prop_steps
   }
-
-  # delete temp file
-  file delete $temp_bd_file
-  incr temp_offset
 }
 
 proc wr_bd_properties { file } {
@@ -848,8 +840,7 @@ proc wr_bd {} {
   variable l_added_bds
   variable l_bd_proc_calls
   variable l_open_bds [list]
-  variable temp_dir
-  variable clean_temp
+  variable bd_proc_dir
 
 
   # String that will hold commands to set BD properties
@@ -889,11 +880,6 @@ proc wr_bd {} {
     lappend l_script_data "make_wrapper -files \[get_files $bd_filename\] -import -top\n"
   }
 
-
-  # Delete temp directory
-  if { $clean_temp == 1} {
-    file delete -force $temp_dir
-  }
 
   wr_bd_wrapper
 }
