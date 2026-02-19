@@ -1,0 +1,22 @@
+#+TITLE: Vivado-git upgrades
+
+* New developments
+Currently, these are the features being worked on vivado-git:
+
+** Separating block design generating procedures from the project generating procedures
+
+The intention is to have a directory inside /src containing the block-design-generating tcl files, instead of merging them in a single tcl script with the project generating procedure.
+
+This should help development by both text and GUI by allowing the block design to be changed in text without the need of rebuilding the whole project, or other block designs
+
+*** TODO Separate the bd design procedure into its own tcl files to be called by the project generation tool
+
+*** TODO Create function that saves the proper block design tcl files in the default place, and restore them
+
+** In-repo scripting
+
+Currently, the script depends on being installed to work or has to be source manually. I believe a better way to do this is to embed it in the source code (directly or as a submodule) to make it easier for developers to collaborate on a new FPGA project,a nd also to allow for breaking backward compatibility in vivado-git - a version of the FPGA code will carry in the repository the scripts that reads/writes it.
+
+*** TODO When creating a generation script, it should have the option to have it in the /vivado-git folder.
+
+This would add to the generated project file the option to source automatically the vivado-git script so the commands will be available for that project, using that specific version of the script.
