@@ -9,9 +9,9 @@ The intention is to have a directory inside /src containing the block-design-gen
 
 This should help development by both text and GUI by allowing the block design to be changed in text without the need of rebuilding the whole project, or other block designs
 
-*** TODO Separate the bd design procedure into its own tcl files to be called by the project generation tool
+*** DONE Separate the bd design procedure into its own tcl files to be called by the project generation tool
 
-*** TODO Create function that saves the proper block design tcl files in the default place, and restore them
+*** DONE Create function that saves the proper block design tcl files in the default place, and restore them
 
 ** In-repo scripting
 
