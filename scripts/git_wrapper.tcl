@@ -12,6 +12,7 @@
 namespace eval ::git_wrapper {
     namespace export git
     namespace export wproj
+    namespace export update_bd
     namespace import ::custom_projutils::write_project_tcl_git
     namespace import ::current_project
     namespace import ::common::get_property
@@ -66,6 +67,68 @@ namespace eval ::git_wrapper {
 
         # Now commit everything
         exec git {*}$args
+    }
+
+    proc update_bd {{bd_name ""}} {
+        # Change directory to project directory if not in it yet
+        set proj_dir [regsub {\/vivado_project$} [get_property DIRECTORY [current_project]] {}]
+        set current_dir [pwd]
+        if {
+            [string compare -nocase $proj_dir $current_dir]
+        } then {
+            puts "Not in project directory"
+            puts "Changing directory to: ${proj_dir}"
+            cd $proj_dir
+        }
+
+        set origin_dir $proj_dir
+
+        if { $bd_name == "" } {
+            # Find all BD tcl files in src/bd/
+            set bd_tcl_files [glob -nocomplain -directory [file join $origin_dir "src/bd"] *.tcl]
+            if { [llength $bd_tcl_files] == 0 } {
+                puts "No BD tcl files found in src/bd/"
+                return
+            }
+        } else {
+            set bd_tcl_files [list [file join $origin_dir "src/bd" "${bd_name}.tcl"]]
+        }
+
+        foreach bd_tcl_file $bd_tcl_files {
+            set bd_base [file rootname [file tail $bd_tcl_file]]
+
+            if { ![file exists $bd_tcl_file] } {
+                puts "ERROR: BD tcl file not found: $bd_tcl_file"
+                continue
+            }
+
+            # Remove existing BD from project if it exists
+            set existing_bd [get_files -quiet ${bd_base}.bd]
+            if { $existing_bd != "" } {
+                # Close the BD if it's open
+                catch { close_bd_design [get_bd_designs -quiet $bd_base] }
+                # Remove from project
+                remove_files $existing_bd
+                puts "Removed existing BD: $bd_base"
+            }
+
+            # Source the BD tcl file (defines the cr_bd_* proc)
+            source $bd_tcl_file
+
+            # Call the proc to recreate the BD
+            set proc_name "cr_bd_${bd_base}"
+            if { [info procs $proc_name] != "" } {
+                puts "Calling $proc_name to recreate BD..."
+                $proc_name ""
+                puts "BD $bd_base recreated successfully."
+
+                # Regenerate wrapper
+                make_wrapper -files [get_files ${bd_base}.bd] -top -import
+                puts "Wrapper regenerated for $bd_base"
+            } else {
+                puts "ERROR: Proc $proc_name not found in $bd_tcl_file"
+            }
+        }
     }
 
     proc wproj {} {

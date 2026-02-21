@@ -6,3 +6,4 @@ namespace import ::custom_projutils::write_project_tcl_git
 source $init_dir/scripts/git_wrapper.tcl
 namespace import ::git_wrapper::git
 namespace import ::git_wrapper::wproj
+namespace import ::git_wrapper::update_bd
