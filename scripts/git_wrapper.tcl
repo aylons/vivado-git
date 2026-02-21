@@ -84,7 +84,6 @@ namespace eval ::git_wrapper {
         set origin_dir $proj_dir
 
         if { $bd_name == "" } {
-            # Find all BD tcl files in src/bd/
             set bd_tcl_files [glob -nocomplain -directory [file join $origin_dir "src/bd"] *.tcl]
             if { [llength $bd_tcl_files] == 0 } {
                 puts "No BD tcl files found in src/bd/"
@@ -102,14 +101,35 @@ namespace eval ::git_wrapper {
                 continue
             }
 
-            # Remove existing BD from project if it exists
+            # Check if the BD tcl source is newer than the existing .bd file
+            set proj_name [get_property name [current_project]]
+            set bd_dir [file join [get_property directory [current_project]] "${proj_name}.srcs" "sources_1" "bd" $bd_base]
+            set bd_file_on_disk [file join $bd_dir "${bd_base}.bd"]
+
+            if { [file exists $bd_file_on_disk] } {
+                set tcl_mtime [file mtime $bd_tcl_file]
+                set bd_mtime [file mtime $bd_file_on_disk]
+                if { $tcl_mtime <= $bd_mtime } {
+                    puts "BD $bd_base is up to date, skipping."
+                    continue
+                }
+            }
+
+            puts "BD $bd_base needs updating..."
+
+            # Close the BD if it's open
+            catch { close_bd_design [get_bd_designs -quiet $bd_base] }
+
+            # Remove existing BD from project if it exists, but keep output products
             set existing_bd [get_files -quiet ${bd_base}.bd]
             if { $existing_bd != "" } {
-                # Close the BD if it's open
-                catch { close_bd_design [get_bd_designs -quiet $bd_base] }
-                # Remove from project
                 remove_files $existing_bd
-                puts "Removed existing BD: $bd_base"
+                puts "Removed existing BD reference: $bd_base"
+            }
+
+            # Delete only the old .bd file on disk so the proc can recreate it
+            if { [file exists $bd_file_on_disk] } {
+                file delete $bd_file_on_disk
             }
 
             # Source the BD tcl file (defines the cr_bd_* proc)
