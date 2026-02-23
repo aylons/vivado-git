@@ -728,9 +728,9 @@ proc write_bd_as_proc { bd_file } {
   set bd_proc_filepath [file join $bd_proc_dir $bd_proc_filename]
 
   if { $a_global_vars(b_arg_no_ip_version) } {
-    write_bd_tcl -no_project_wrapper -no_ip_version -make_local $bd_proc_filepath
+    write_bd_tcl -no_project_wrapper -no_ip_version -make_local -force $bd_proc_filepath
   } else {
-    write_bd_tcl -no_project_wrapper -make_local $bd_proc_filepath
+    write_bd_tcl -no_project_wrapper -make_local -force $bd_proc_filepath
   }
 
   # Set non default properties for the BD
