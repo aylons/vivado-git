@@ -417,7 +417,7 @@ proc write_project_tcl_script {} {
     set _body [read $_vfp]
     close $_vfp
     if { [string first $_proj_dir $_body] != -1 } {
-      send_msg_id Vivado-git-002 CRITICAL_WARNING \
+      send_msg_id Vivado-git-002 {CRITICAL WARNING} \
         "Generated TCL references files inside ${_proj_dir}. \
          These will fail on clean checkout. The directory-containment \
          filter missed something -- please report."
