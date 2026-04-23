@@ -406,6 +406,24 @@ proc write_project_tcl_script {} {
 
   close $a_global_vars(fh)
 
+  # Layer 2 validation: scan the generated TCL for any literal reference
+  # to the .xpr's directory tree. The directory-containment filter (Layer 1)
+  # should make this impossible; if it triggers, the filter missed an edge
+  # case and the exported TCL will fail on a clean checkout.
+  set _proj_dir [file normalize [get_property DIRECTORY [current_project]]]
+  if {[catch {open $a_global_vars(script_file) r} _vfp]} {
+    # non-fatal: skip validation if re-open fails
+  } else {
+    set _body [read $_vfp]
+    close $_vfp
+    if { [string first $_proj_dir $_body] != -1 } {
+      send_msg_id Vivado-git-002 CRITICAL_WARNING \
+        "Generated TCL references files inside ${_proj_dir}. \
+         These will fail on clean checkout. The directory-containment \
+         filter missed something -- please report."
+    }
+  }
+
   if { $a_global_vars(b_arg_dump_proj_info) } {
     close $a_global_vars(def_val_fh)
     close $a_global_vars(dp_fh)
@@ -1284,6 +1302,31 @@ proc is_local_to_project { file } {
   return $is_local
 }
 
+proc is_inside_project_dir { path } {
+  # Summary: return 1 if 'path' lives inside the .xpr's directory tree.
+  # Used to filter out files that are by definition build output
+  # (vivado_project/ subtree). User-authored files live outside it;
+  # files Vivado auto-copied INTO the project (e.g. XCI via IMPORTED_FROM)
+  # should be recorded by their original IMPORTED_FROM path, not the
+  # post-import path.
+  set proj_dir [file normalize [get_property DIRECTORY [current_project]]]
+  set norm     [file normalize $path]
+  return [string match "${proj_dir}/*" $norm]
+}
+
+proc is_filter_property_value { val } {
+  # Summary: return 1 if any whitespace/comma/semicolon-separated token in
+  # 'val' looks like an absolute path inside the project directory tree.
+  # Used to suppress set_property writes that would inject build-output
+  # paths (e.g. INCREMENTAL_CHECKPOINT pointing at .runs/.../*.dcp) into
+  # the exported TCL.
+  if { [string is space $val] || ![string is print $val] } { return 0 }
+  foreach token [split $val " \t\n,;"] {
+    if { [string match "/*" $token] && [is_inside_project_dir $token] } { return 1 }
+  }
+  return 0
+}
+
 proc is_ip_readonly_prop { name } {
   # Summary: Return true if dealing with following IP properties that are not settable for an IP in read-only state
   # Argument Usage:
@@ -1316,6 +1359,12 @@ proc write_properties { prop_info_list get_what tcl_obj {delim "#"} } {
       set elem [split $x $delim]
       set name [lindex $elem 0]
       set value [lindex $elem 1]
+      # Suppress writes whose value would inject a project-dir literal
+      # (e.g. INCREMENTAL_CHECKPOINT pointing at .runs/.../*.dcp). The
+      # name-side INCREMENTAL_CHECKPOINT filter in 'filter' remains a
+      # belt-and-suspenders backup; this catches any other property whose
+      # value happens to point inside vivado_project/.
+      if { [is_filter_property_value $value] } { continue }
       if { ([is_ip_readonly_prop $name]) && ([string equal $get_what "get_files"]) } {
         set cmd_str "if \{ !\[get_property \"is_locked\" \$file_obj\] \} \{"
         lappend l_script_data "$cmd_str"
@@ -1921,8 +1970,19 @@ proc write_files { proj_dir proj_name tcl_obj type } {
   foreach file [get_files -quiet -norecurse -of_objects [get_filesets $tcl_obj] -filter $bc_managed_fs_filter] {
     if { [is_switch_network_source $file] } { continue }
     if { [file extension $file] == ".xcix" } { continue }
-    # Skip design checkpoint files (.dcp) - these are synthesis/implementation artifacts
-    if { [file extension $file] == ".dcp" } { continue }
+    # Skip anything inside the .xpr's directory -- by definition build output.
+    # Exception: files whose IMPORTED_FROM points OUTSIDE the project (those
+    # are user-authored files Vivado auto-copied in; record by original path).
+    # This single rule subsumes the old per-extension .dcp skip and any other
+    # build-artifact extensions Xilinx may add in the future.
+    if { [is_inside_project_dir $file] } {
+      set fobj [lindex [get_files -quiet $file] 0]
+      set imp ""
+      if { $fobj ne "" && [lsearch [list_property $fobj] "IMPORTED_FROM"] != -1 } {
+        set imp [get_property IMPORTED_FROM $fobj]
+      }
+      if { $imp eq "" || [is_inside_project_dir $imp] } { continue }
+    }
     # Skip direct import/add of BD files if -use_bd_files is not provided
     if { [file extension $file] == ".bd" && !$a_global_vars(b_arg_use_bd_files) } { continue }
 
